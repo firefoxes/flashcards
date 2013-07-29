@@ -4,86 +4,99 @@ module Game
 
   extend self
 
-  SAYINGS = File.read('sayings3.txt').
-  # split source file into lines without newline breaks
-  lines.map(&:chomp)
+  DEFAULT_DATA_FILE = 'sayings3.txt'
 
-  def select_question
-    # select random starting line
-    rand(SAYINGS.length)
-  end
-
-  def question(line)
-    # find the current line
-    SAYINGS[line].
-    # split on tab and return non-English (position 1)
-    split(/\t/)[1]
-  end
-
-  def answer(line)
-    # find the current line
-    SAYINGS[line].
-    # split on tab and return English translation (position 0)
-    split(/\t/)[0]
-  end
-
-  def incorrect_answers(line)
-    # get wrong answers from around the same point in file as the phrase
-    start = line + 1 if line <= SAYINGS.length - 3
-    start = line - 4 if line > SAYINGS.length - 3
-    wrong_answers = []
-    #put the wrong answers into an array
-    (start).upto(start+1) do |i|
-      wrong_answers << answer(i)
+  def parse_data_file file=File.open(Game::DEFAULT_DATA_FILE, 'r')
+    file_data = Hash.new
+      file.each_line do |line|
+        # split each line from the file at the tab
+        line_data = line.split(/\t/)
+        # create a hash, with the Yiddish (position 1) as the key
+        file_data[line_data[1].chomp] = line_data[0]
     end
-    wrong_answers
+    file_data
   end
 
-  def answer_choices(line)
-    letters, choices = ('A'..'Z').to_a, []
-    # mix the correct answer in with the incorrect answers and shuffle
-    (incorrect_answers(line) << answer(line)).shuffle.
-    # puts a letter in front of each answer for display
-    each_with_index{|answer, index| choices << "#{letters[index]} : #{answer}"}
-    # return the answers matched to letters
+  def random_q_and_a hash
+    # take a random key (definition) from the list
+    random_key = hash.keys.sample
+    # return an array of the definition and translation
+    [random_key, hash[random_key]]
+  end
+
+  def random_incorrect_answers number, correct_answer, all_answers
+    incorrect_answers = []
+    until incorrect_answers.length == number
+      # until we have the amount requested, get a random answer
+      random_answer = all_answers.sample
+      # and if it does not match the correct answer, put into array
+      incorrect_answers << random_answer if random_answer != correct_answer
+    end
+    incorrect_answers
+  end
+
+  def choices_from_answers answers
+    letters, choices = ('a'..'z').to_a, []
+    # pair each answer with a letter, i.e. [a:, "possible answer"]
+    answers.each_with_index {|answer, i| choices << [letters[i].to_sym, answer]}
+    # return array pairs
     choices
   end
 
-  def evaluate(user_answer, line, choices)
-    # identify which choice user made
-    user_selected_answer = choices.select{|answer| answer[0]==user_answer.upcase}
-    # check if that was a valid selection
-    return nil if user_selected_answer.empty?
-    # trim the letter off the answer
-    user_selected_answer = user_selected_answer.first[4..-1]
-    return true if user_selected_answer == answer(line)
-    return false if user_selected_answer != answer(line)
+  def format_choices choices
+    formatted_choices = []
+    choices.each do |choice|
+      # join upcased letters with answers
+      formatted_choices << "#{choice[0].upcase}: #{choice[1]}"
+    end
+    formatted_choices
+  end
+
+  def parse_choice user_input
+    # remove whitespace, downcase, and make a symbol
+    user_input.strip.downcase.to_sym
+  end
+
+  def evaluate user_choice, correct_answer, choices
+    # find the answer that the user chose
+    selected_answer = choices.find{|choice| choice[0] == user_choice}
+    return :invalid if selected_answer.nil?
+    # compare to the correct answer
+    return :correct if selected_answer[1] == correct_answer
+    return :incorrect if selected_answer[1] != correct_answer
   end
 
 end
 
 if $0 == __FILE__
-  # choose a saying and print the Yiddish translation
-  line = Game.select_question
-  puts Game.question(line)
 
-  # display several possible tranlations
-  puts choices = Game.answer_choices(line)
+  q_and_a_data =
+    Game.parse_data_file File.open(Game::DEFAULT_DATA_FILE, 'r') # think r is default
+
+  question, correct_answer = Game.random_q_and_a q_and_a_data
+
+  all_answers = q_and_a_data.values
+  incorrect_answers = Game.random_incorrect_answers 2, correct_answer, all_answers
+
+  puts question
   puts
+  answers = [correct_answer] + incorrect_answers
+  answers = answers.shuffle
 
-  # prompt user to choose the correct translation
+  choices = Game.choices_from_answers answers # [[:a, "some answer"], [:b, ""]]
+  puts Game.format_choices choices
   puts
   puts "Enter the letter of the correct translation"
-  user_answer = gets.chomp
   puts
+  user_choice = Game.parse_choice gets.chomp # "   A   " => :a
 
-  # evaluate if user was correct
-  case Game.evaluate(user_answer, line, choices)
-  when nil
+  case Game.evaluate user_choice, correct_answer, choices
+  when :invalid
     puts "That's not a valid selection"
-  when true
+  when :correct
     puts "Correct!"
-  when false
-    puts "Wrong, the correct answer was '#{Game.answer(line)}'"
+  when :incorrect
+    puts "Wrong, the correct answer was '#{correct_answer}'"
   end
+
 end
