@@ -8,11 +8,11 @@ module Game
 
   def parse_data_file file=File.open(Game::DEFAULT_DATA_FILE, 'r')
     file_data = Hash.new
-      file.each_line do |line|
-        # split each line from the file at the tab
-        line_data = line.split(/\t/)
-        # create a hash, with the Yiddish (position 1) as the key
-        file_data[line_data[1].chomp] = line_data[0]
+    file.each_line do |line|
+      # split each line from the file at the tab
+      line_data = line.split(/\t/)
+      # create a hash, with the Yiddish (position 1) as the key
+      file_data[line_data[1].chomp] = line_data[0]
     end
     file_data
   end
